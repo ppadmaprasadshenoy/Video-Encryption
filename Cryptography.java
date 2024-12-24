@@ -1,283 +1,195 @@
-package in.ganeshsharma.EncryptionSystem;
+package in.pp.EncryptionSystem;
 
-
-import java.nio.*;
-import java.nio.channels.*;
-import java.io.*;
-import java.awt.*;
-import java.awt.event.*;
-import java.awt.Color.*;
+import javax.crypto.*;
+import javax.crypto.spec.SecretKeySpec;
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
-import java.util.*;
-import java.awt.image.BufferedImage;
-import javax.imageio.ImageIO;
-class JavaFileFilter extends FileFilter{
-	public boolean accept(File file)
-	{
-		if(file.getName().endsWith(".txt")) return true;
-		if(file.getName().endsWith(".java")) return true;
-		if(file.isDirectory()) return true;
-		return false;
-	}
-	public String getDescription()
-	{
-		return "Java and Text file for Encryption and Dencryption";
-	}
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+
+// Custom filter for video files
+class VideoFileFilter extends FileFilter {
+    public boolean accept(File file) {
+        return file.getName().endsWith(".mp4") || file.isDirectory();
+    }
+
+    public String getDescription() {
+        return "*.mp4";
+    }
 }
 
-class SaveJavaFileFilter extends FileFilter
- {
-    public boolean accept(File f)
-   {
-        if (f.isDirectory())
-        	return true;
-
-         String s = f.getName();
-
-        return s.endsWith(".java");
-   }
-
-   public String getDescription()
-  {
-       return "*.java";
-  }
-
-}
-
-class SaveTextFileFilter extends FileFilter
- {
-    public boolean accept(File f)
-   {
-        if (f.isDirectory())
-        	return true;
-         String s = f.getName();
-
-        return s.endsWith(".txt");
-   }
-
-   public String getDescription()
-  {
-       return "*.txt";
-  }
-
-}
-public class Cryptography extends JFrame implements ActionListener
-{
-	public JButton browse,enc,denc,cancel;
-    private JLabel label;
+public class Cryptography extends JFrame implements ActionListener {
+    private JButton browse, enc, denc, cancel;
     private JTextField filename;
     private JFileChooser jfc;
     private File file;
-    Dimension d = null;
-FileInputStream fin;
-FileOutputStream fout;
-FileChannel fichan,fochan;
-long fsize;
-ByteBuffer mbuf,ombuf;
-long key=0;
-String ext="";
-JScrollPane displayScrollPane;
-ImageIcon image;
-int wdth,hight;
 
     public Cryptography() {
-    	super("Encryption and Decryption Software");
-    	d=Toolkit.getDefaultToolkit().getScreenSize();
-    	setBackground(Color.yellow);
-		setForeground(Color.red);
-    	wdth=d.width/2;
-    	hight=d.height/2;
-        setSize(wdth, hight);
-        setLocation(d.width/4, d.height/4);
+        super("Video Encryption & Decryption");
+        Dimension d = Toolkit.getDefaultToolkit().getScreenSize();
+        setSize(d.width / 2, d.height / 2);
+        setLocation(d.width / 4, d.height / 4);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
-        label = new JLabel("CHOOSE THE TEXT OR JAVA FILE FOR ENCRYPTION OR DECRYPTION");
-        filename = new JTextField(50);
+
+        // Main panel with background color
+        JPanel mainPanel = new JPanel(new BorderLayout());
+        mainPanel.setBackground(new Color(45, 52, 54));
+
+        // Title label
+        JLabel title = new JLabel("Video Encryption & Decryption", SwingConstants.CENTER);
+        title.setFont(new Font("Arial", Font.BOLD, 24));
+        title.setForeground(Color.WHITE);
+
+        // Center panel for inputs and buttons
+        JPanel centerPanel = new JPanel(new GridLayout(5, 1, 10, 10));
+        centerPanel.setBackground(new Color(45, 52, 54));
+
+        // File input field
+        filename = new JTextField(30);
         filename.setEditable(false);
-        browse=new JButton("Browse");
-        browse.setForeground(Color.BLUE);
-        enc=new JButton("Encrypt");
-        enc.setForeground(Color.BLUE);
+        filename.setFont(new Font("Arial", Font.PLAIN, 16));
+        filename.setForeground(Color.BLACK);
+
+        // Buttons
+        browse = createStyledButton("Browse", new Color(0, 184, 148));
+        enc = createStyledButton("Encrypt", new Color(9, 132, 227));
+        denc = createStyledButton("Decrypt", new Color(232, 67, 147));
+        cancel = createStyledButton("Cancel", new Color(214, 48, 49));
+
         enc.setEnabled(false);
-        denc=new JButton("Dencrypt");
-        denc.setForeground(Color.BLUE);
         denc.setEnabled(false);
-        cancel=new JButton("Cancel");
-        cancel.setForeground(Color.RED);
-        jfc=new JFileChooser();
-        jfc.setFileFilter(new JavaFileFilter());
-        JPanel buttonPanel1 = new JPanel();
-        JPanel buttonPanel2 = new JPanel();
-        JPanel loadPanel = new JPanel();
-        buttonPanel1.setPreferredSize(new Dimension(100,100));
-        buttonPanel2.setPreferredSize(new Dimension(100,100));
-        loadPanel.setPreferredSize(new Dimension(100,100));
-        buttonPanel1.setOpaque(true);
-		buttonPanel2.setOpaque(true);
-		loadPanel.setOpaque(true);
-		loadPanel.setBackground(Color.yellow);
-		buttonPanel1.setBackground(Color.green);
-		buttonPanel1.setForeground(Color.red);
-		buttonPanel2.setBackground(Color.green);
-		buttonPanel2.setForeground(Color.red);
-		buttonPanel1.setBorder(BorderFactory.createLineBorder(Color.BLUE));
-		buttonPanel2.setBorder(BorderFactory.createLineBorder(Color.BLUE));
-		image=new ImageIcon("logo.GIF");
-JLabel im= new JLabel(image);
-loadPanel.add(im);
 
-		buttonPanel1.add(label);
-        buttonPanel1.add(filename);
-        buttonPanel1.add(browse);
-        buttonPanel2.add(enc);
-        buttonPanel1.add(denc);
-        buttonPanel2.add(cancel);
-        label.setBounds(105, 10, 400, 25);
-       	browse.addActionListener(this);
-       	enc.addActionListener(this);
-       	denc.addActionListener(this);
-       	cancel.addActionListener(this);
-       	add(buttonPanel1, BorderLayout.NORTH);
-        add(loadPanel, BorderLayout.CENTER);
-        add(buttonPanel2, BorderLayout.SOUTH);
+        // File chooser
+        jfc = new JFileChooser();
+        jfc.setFileFilter(new VideoFileFilter());
+        jfc.setCurrentDirectory(new File("C:\\Users\\ASUS\\Desktop\\RMTC Project\\videos")); // Default folder
+
+        // Add components to center panel
+        centerPanel.add(createStyledLabel("Select a video file for Encryption/Decryption:"));
+        centerPanel.add(filename);
+        centerPanel.add(browse);
+        centerPanel.add(enc);
+        centerPanel.add(denc);
+        centerPanel.add(cancel);
+
+        // Add components to main panel
+        mainPanel.add(title, BorderLayout.NORTH);
+        mainPanel.add(centerPanel, BorderLayout.CENTER);
+
+        add(mainPanel);
         setVisible(true);
-     }
-    public void actionPerformed(ActionEvent e) {
-    	if(e.getSource() == browse)	{
-    		int result = jfc.showOpenDialog(null);
-    		 	if(result==JFileChooser.APPROVE_OPTION)
-    		 	{
-    		 		label.setText("Selected file is : "+jfc.getSelectedFile().getName());
-    		 		filename.setText(jfc.getSelectedFile().getPath());
-    		 		file=jfc.getSelectedFile();
-    		 		denc.setEnabled(true);
-    		 		enc.setEnabled(true);
-    		 	}
-    		 	else
-    		 	{
-    		 		filename.setText("No file selected");
-    		 		denc.setEnabled(false);
-    		 		enc.setEnabled(false);
-    		 	}
-    	}
-    	if(e.getSource()==enc)
-    	{
-    		try
-    		{
-    		key=enterKey();
-    		if(key>=1)
-    		{
-    		JOptionPane.showMessageDialog(null,"Save the Encrypted file","ENCRYPTION COMPLETED",JOptionPane.INFORMATION_MESSAGE);
-    	convert(-key);
-    		}
-    		else
-	   			JOptionPane.showMessageDialog(null,"Please enter a nonzero key","WARNING",JOptionPane.WARNING_MESSAGE);
-    		}catch(Exception ioee){
-    		}
-    	}
-    	if(e.getSource()==denc)
-    	{try
-    	{
-	   		key=enterKey();
-	   		if(key>=1)
-	   		{
-	   		JOptionPane.showMessageDialog(null,"Save the Decrypted file","DECRYPTION COMPLETED",JOptionPane.INFORMATION_MESSAGE);
-	   		convert(key);
-	   		}
-	   		else
-	   			JOptionPane.showMessageDialog(null,"Please enter a nonzero key","WARNING",JOptionPane.WARNING_MESSAGE);
-    	}catch(Exception ex){}
-    	}
-    if(e.getSource() == cancel)	{
-    		System.exit(1);
-    	}
+
+        // Add action listeners
+        browse.addActionListener(this);
+        enc.addActionListener(this);
+        denc.addActionListener(this);
+        cancel.addActionListener(this);
     }
-private long enterKey() throws IOException
-{
-	long k=0;
-	String key=JOptionPane.showInputDialog(null,"Enter the Key","SECURE KEYS",JOptionPane.QUESTION_MESSAGE);
-	long intKey=(long)Integer.parseInt(key);
-	long temp=intKey;
-	checking:
-	{
-	do
-	{
-	k=k+(intKey%10);
-	intKey=intKey/10;
-	}while(intKey>=10);
-	k=k+intKey;
-	if(k>32)
-	{
-		intKey=temp/10;
-		break checking;
-	}
-	}
-	return k;
-}
-private void convert(long secureKey)
-{
-	long Key=secureKey;
-try
-{
-JFileChooser jFileChooser = new JFileChooser();
-jFileChooser.addChoosableFileFilter(new SaveJavaFileFilter());
-jFileChooser.addChoosableFileFilter(new SaveTextFileFilter());
-jFileChooser.setSelectedFile(new File("fileToSave.txt"));
-int responce = jFileChooser.showSaveDialog(null);
-if(responce==JFileChooser.APPROVE_OPTION)
-{
-    String extension=jFileChooser.getFileFilter().getDescription();
-    if(extension.equals("*.java"))
-      {
-          ext=".java";
-      }
-    if(extension.equals("*.txt"))
-      {
-          ext=".txt";
-      }
-}
 
-fin=new FileInputStream(file);
-fout=new FileOutputStream(jFileChooser.getSelectedFile()+ext);
-fichan=fin.getChannel();
-fochan=fout.getChannel();
-fsize=fichan.size();
-mbuf=ByteBuffer.allocate((int)fsize);
-ombuf=ByteBuffer.allocate((int)fsize);
-fichan.read(mbuf);
-mbuf.rewind();
-for(int i=0;i<fsize;i++)
-{
-long data=((long) mbuf.get());
-ombuf.put((byte)(data+Key));
-}
-ombuf.rewind();
-fochan.write(ombuf);
-fichan.close();
-fin.close();
-fochan.close();
-fout.close();
-}
-catch(IOException e)
-{
-System.out.println(e);
-System.exit(1);
-}
-catch(BufferUnderflowException uf)
-{
-	System.out.println(uf);
-}
- }
- public static void main(String args[]){
-    	SwingUtilities.invokeLater(new Runnable()
-		{
-			public void run()
-			{
-				new Cryptography();
-			}
-		});
-	}
+    private JButton createStyledButton(String text, Color color) {
+        JButton button = new JButton(text);
+        button.setFont(new Font("Arial", Font.BOLD, 16));
+        button.setForeground(Color.WHITE);
+        button.setBackground(color);
+        button.setFocusPainted(false);
+        button.setBorderPainted(false);
 
-}
+        // Adding hover effect
+        button.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                button.setBackground(button.getBackground().darker());
+            }
 
+            @Override
+            public void mouseExited(MouseEvent e) {
+                button.setBackground(color);
+            }
+        });
+
+        return button;
+    }
+
+    private JLabel createStyledLabel(String text) {
+        JLabel label = new JLabel(text, SwingConstants.LEFT);
+        label.setFont(new Font("Arial", Font.PLAIN, 16));
+        label.setForeground(Color.WHITE);
+        return label;
+    }
+
+    @Override
+    public void actionPerformed(ActionEvent e) {
+        if (e.getSource() == browse) {
+            int result = jfc.showOpenDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+                file = jfc.getSelectedFile();
+                filename.setText(file.getAbsolutePath());
+                enc.setEnabled(true);
+                denc.setEnabled(true);
+            }
+        } else if (e.getSource() == enc || e.getSource() == denc) {
+            try {
+                String key = JOptionPane.showInputDialog(this, "Enter a key (16/24/32 characters for AES):");
+                if (key == null || key.isEmpty()) {
+                    throw new IllegalArgumentException("Key cannot be null or empty.");
+                }
+    
+                int validLength = key.length() <= 16 ? 16 : key.length() <= 24 ? 24 : key.length() <= 32 ? 32 : -1;
+                if (validLength == -1) {
+                    throw new IllegalArgumentException("Key length exceeds the maximum supported length of 32 characters.");
+                }
+    
+                key = String.format("%-" + validLength + "s", key).substring(0, validLength);
+    
+                boolean isEncryption = (e.getSource() == enc);
+                processFile(key, isEncryption);
+    
+                JOptionPane.showMessageDialog(this, (isEncryption ? "Encryption" : "Decryption") + " completed successfully!");
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        } else if (e.getSource() == cancel) {
+            System.exit(0);
+        }
+    }    
+
+    private void processFile(String key, boolean isEncryption) throws Exception {
+        // Prepare output directories
+        String outputDir = isEncryption ? "encrypted" : "decrypted";
+        Files.createDirectories(Paths.get(outputDir));
+
+        // Output file
+        String outputFileName = outputDir + File.separator + (isEncryption ? "encrypted_" : "decrypted_") + file.getName();
+
+        SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(), "AES");
+        Cipher cipher = Cipher.getInstance("AES");
+        cipher.init(isEncryption ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE, secretKey);
+
+        try (FileChannel inputChannel = new FileInputStream(file).getChannel();
+             FileChannel outputChannel = FileChannel.open(Paths.get(outputFileName), StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+
+            ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024); // 1 MB buffer
+
+            while (inputChannel.read(buffer) > 0) {
+                buffer.flip();
+                byte[] outputBytes = cipher.update(buffer.array(), 0, buffer.limit());
+                outputChannel.write(ByteBuffer.wrap(outputBytes));
+                buffer.clear();
+            }
+
+            byte[] finalBytes = cipher.doFinal();
+            outputChannel.write(ByteBuffer.wrap(finalBytes));
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(Cryptography::new);
+    }
+}
