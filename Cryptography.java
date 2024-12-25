@@ -16,11 +16,17 @@ import java.nio.file.StandardOpenOption;
 // Custom filter for video files
 class VideoFileFilter extends FileFilter {
     public boolean accept(File file) {
-        return file.getName().endsWith(".mp4") || file.isDirectory();
+        String[] supportedFormats = { ".mp4", ".avi", ".mkv", ".mov", ".webm", ".hevc" };
+        for (String format : supportedFormats) {
+            if (file.getName().endsWith(format)) {
+                return true;
+            }
+        }
+        return file.isDirectory();
     }
 
     public String getDescription() {
-        return "*.mp4";
+        return "*.mp4, *.avi, *.mkv, *.mov, *.webm, *.hevc";
     }
 }
 
