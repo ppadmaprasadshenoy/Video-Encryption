@@ -146,25 +146,27 @@ public class Cryptography extends JFrame implements ActionListener {
                 if (key == null || key.isEmpty()) {
                     throw new IllegalArgumentException("Key cannot be null or empty.");
                 }
-    
+
                 int validLength = key.length() <= 16 ? 16 : key.length() <= 24 ? 24 : key.length() <= 32 ? 32 : -1;
                 if (validLength == -1) {
-                    throw new IllegalArgumentException("Key length exceeds the maximum supported length of 32 characters.");
+                    throw new IllegalArgumentException(
+                            "Key length exceeds the maximum supported length of 32 characters.");
                 }
-    
+
                 key = String.format("%-" + validLength + "s", key).substring(0, validLength);
-    
+
                 boolean isEncryption = (e.getSource() == enc);
                 processFile(key, isEncryption);
-    
-                JOptionPane.showMessageDialog(this, (isEncryption ? "Encryption" : "Decryption") + " completed successfully!");
+
+                JOptionPane.showMessageDialog(this,
+                        (isEncryption ? "Encryption" : "Decryption") + " completed successfully!");
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, "Error: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
         } else if (e.getSource() == cancel) {
             System.exit(0);
         }
-    }    
+    }
 
     private void processFile(String key, boolean isEncryption) throws Exception {
         // Prepare output directories
@@ -172,16 +174,21 @@ public class Cryptography extends JFrame implements ActionListener {
         Files.createDirectories(Paths.get(outputDir));
 
         // Output file
-        String outputFileName = outputDir + File.separator + (isEncryption ? "encrypted_" : "decrypted_") + file.getName();
+        String outputFileName = outputDir + File.separator + (isEncryption ? "encrypted_" : "decrypted_")
+                + file.getName();
 
         SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(), "AES");
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(isEncryption ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE, secretKey);
 
         try (FileChannel inputChannel = new FileInputStream(file).getChannel();
-             FileChannel outputChannel = FileChannel.open(Paths.get(outputFileName), StandardOpenOption.CREATE, StandardOpenOption.WRITE)) {
+                FileChannel outputChannel = FileChannel.open(Paths.get(outputFileName), StandardOpenOption.CREATE,
+                        StandardOpenOption.WRITE)) {
 
-            ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024); // 1 MB buffer
+            long fileSize = file.length();
+            int bufferSize = (fileSize > 1_000_000_000L) ? 10 * 1024 * 1024 : 1 * 1024 * 1024; // Adjust buffer for
+                                                                                               // large files
+            ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
 
             while (inputChannel.read(buffer) > 0) {
                 buffer.flip();
