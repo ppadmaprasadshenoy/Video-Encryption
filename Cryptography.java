@@ -75,7 +75,7 @@ public class Cryptography extends JFrame implements ActionListener {
         // File chooser
         jfc = new JFileChooser();
         jfc.setFileFilter(new VideoFileFilter());
-        jfc.setCurrentDirectory(new File("C:\\Users\\ASUS\\Desktop\\RMTC Project\\videos")); // Default folder
+        jfc.setCurrentDirectory(new File("C:\\Users\\ASUS\\Desktop\\RMTC Project\\Video-Encryption\\videos")); // default
 
         // Add components to center panel
         centerPanel.add(createStyledLabel("Select a video file for Encryption/Decryption:"));
