@@ -1,0 +1,3 @@
+Compile: javac -d . Cryptography.java Main.java
+
+Run: java Main.java
