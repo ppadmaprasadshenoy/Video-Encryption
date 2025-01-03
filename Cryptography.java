@@ -223,8 +223,12 @@ public class Cryptography extends JFrame implements ActionListener {
             }
 
             long fileSize = file.length() - (isEncryption ? 0 : salt.length);
-            int bufferSize = (fileSize > 1_000_000_000L) ? 10 * 1024 * 1024 : 1 * 1024 * 1024; // Adjust buffer for
-                                                                                               // large files
+
+            // Get available memory and adjust buffer size dynamically
+            long availableMemory = Runtime.getRuntime().freeMemory();
+            int maxBufferSize = 10 * 1024 * 1024; // Maximum buffer size (10 MB)
+            int bufferSize = (int) Math.min(Math.min(fileSize, availableMemory / 10), maxBufferSize);
+
             ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
 
             while (inputChannel.read(buffer) > 0) {
