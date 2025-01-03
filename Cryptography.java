@@ -1,6 +1,7 @@
 package in.pp.EncryptionSystem;
 
 import javax.crypto.*;
+import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.swing.*;
 import javax.swing.filechooser.FileFilter;
@@ -12,6 +13,9 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
 
 // Custom filter for video files
 class VideoFileFilter extends FileFilter {
@@ -142,21 +146,22 @@ public class Cryptography extends JFrame implements ActionListener {
             }
         } else if (e.getSource() == enc || e.getSource() == denc) {
             try {
-                String key = JOptionPane.showInputDialog(this, "Enter a key (16/24/32 characters for AES):");
-                if (key == null || key.isEmpty()) {
-                    throw new IllegalArgumentException("Key cannot be null or empty.");
+                String password = JOptionPane.showInputDialog(this, "Enter a password for AES key derivation:");
+                if (password == null || password.isEmpty()) {
+                    throw new IllegalArgumentException("Password cannot be null or empty.");
                 }
 
-                int validLength = key.length() <= 16 ? 16 : key.length() <= 24 ? 24 : key.length() <= 32 ? 32 : -1;
+                int validLength = password.length() <= 16 ? 16
+                        : password.length() <= 24 ? 24 : password.length() <= 32 ? 32 : -1;
                 if (validLength == -1) {
                     throw new IllegalArgumentException(
-                            "Key length exceeds the maximum supported length of 32 characters.");
+                            "Password length exceeds the maximum supported length of 32 characters.");
                 }
 
-                key = String.format("%-" + validLength + "s", key).substring(0, validLength);
+                password = String.format("%-" + validLength + "s", password).substring(0, validLength);
 
                 boolean isEncryption = (e.getSource() == enc);
-                processFile(key, isEncryption);
+                processFile(password, isEncryption);
 
                 JOptionPane.showMessageDialog(this,
                         (isEncryption ? "Encryption" : "Decryption") + " completed successfully!");
@@ -168,7 +173,21 @@ public class Cryptography extends JFrame implements ActionListener {
         }
     }
 
-    private void processFile(String key, boolean isEncryption) throws Exception {
+    public static SecretKeySpec deriveKey(String password) throws Exception {
+        byte[] salt = new byte[16]; // Random salt (it should ideally be stored along with the encrypted file)
+        SecureRandom random = new SecureRandom();
+        random.nextBytes(salt);
+
+        // PBKDF2 key derivation with 10000 iterations, 256-bit key (32 bytes)
+        PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 10000, 256);
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        byte[] key = factory.generateSecret(spec).getEncoded();
+
+        // Return the derived key
+        return new SecretKeySpec(key, "AES");
+    }
+
+    private void processFile(String password, boolean isEncryption) throws Exception {
         // Prepare output directories
         String outputDir = isEncryption ? "encrypted" : "decrypted";
         Files.createDirectories(Paths.get(outputDir));
@@ -177,7 +196,24 @@ public class Cryptography extends JFrame implements ActionListener {
         String outputFileName = outputDir + File.separator + (isEncryption ? "encrypted_" : "decrypted_")
                 + file.getName();
 
-        SecretKeySpec secretKey = new SecretKeySpec(key.getBytes(), "AES");
+        byte[] salt = new byte[16];
+        if (isEncryption) {
+            // Generate a new random salt
+            SecureRandom random = new SecureRandom();
+            random.nextBytes(salt);
+        } else {
+            // Read the salt from the encrypted file
+            try (FileChannel inputChannel = new FileInputStream(file).getChannel()) {
+                ByteBuffer saltBuffer = ByteBuffer.allocate(salt.length);
+                inputChannel.read(saltBuffer);
+                saltBuffer.flip();
+                salt = saltBuffer.array();
+            }
+        }
+
+        SecretKeySpec secretKey = deriveKey(password, salt); // Derive key using the salt
+
+        // Initialize the Cipher
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(isEncryption ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE, secretKey);
 
@@ -185,7 +221,15 @@ public class Cryptography extends JFrame implements ActionListener {
                 FileChannel outputChannel = FileChannel.open(Paths.get(outputFileName), StandardOpenOption.CREATE,
                         StandardOpenOption.WRITE)) {
 
-            long fileSize = file.length();
+            if (isEncryption) {
+                // Write the salt at the beginning of the file
+                outputChannel.write(ByteBuffer.wrap(salt));
+            } else {
+                // Skip the salt in the encrypted file
+                inputChannel.position(salt.length);
+            }
+
+            long fileSize = file.length() - (isEncryption ? 0 : salt.length);
             int bufferSize = (fileSize > 1_000_000_000L) ? 10 * 1024 * 1024 : 1 * 1024 * 1024; // Adjust buffer for
                                                                                                // large files
             ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
@@ -200,6 +244,13 @@ public class Cryptography extends JFrame implements ActionListener {
             byte[] finalBytes = cipher.doFinal();
             outputChannel.write(ByteBuffer.wrap(finalBytes));
         }
+    }
+
+    private static SecretKeySpec deriveKey(String password, byte[] salt) throws Exception {
+        PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 10000, 256);
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        byte[] key = factory.generateSecret(spec).getEncoded();
+        return new SecretKeySpec(key, "AES");
     }
 
     public static void main(String[] args) {
