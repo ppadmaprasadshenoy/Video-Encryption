@@ -1,5 +1,3 @@
-package in.pp.EncryptionSystem;
-
 import javax.crypto.*;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
@@ -16,6 +14,7 @@ import java.nio.file.StandardOpenOption;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
+import java.util.concurrent.*;
 
 // Custom filter for video files
 class VideoFileFilter extends FileFilter {
@@ -210,9 +209,12 @@ public class Cryptography extends JFrame implements ActionListener {
         Cipher cipher = Cipher.getInstance("AES");
         cipher.init(isEncryption ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE, secretKey);
 
+        // Create a ForkJoinPool to handle parallel tasks
+        ForkJoinPool forkJoinPool = new ForkJoinPool();
+
         try (FileChannel inputChannel = new FileInputStream(file).getChannel();
-                FileChannel outputChannel = FileChannel.open(Paths.get(outputFileName), StandardOpenOption.CREATE,
-                        StandardOpenOption.WRITE)) {
+             FileChannel outputChannel = FileChannel.open(Paths.get(outputFileName), StandardOpenOption.CREATE,
+                     StandardOpenOption.WRITE)) {
 
             if (isEncryption) {
                 // Write the salt at the beginning of the file
@@ -223,24 +225,40 @@ public class Cryptography extends JFrame implements ActionListener {
             }
 
             long fileSize = file.length() - (isEncryption ? 0 : salt.length);
+            long chunkSize = 10 * 1024 * 1024; // 10 MB chunk size
+            long numChunks = (fileSize + chunkSize - 1) / chunkSize;
 
-            // Get available memory and adjust buffer size dynamically
-            long availableMemory = Runtime.getRuntime().freeMemory();
-            int maxBufferSize = 10 * 1024 * 1024; // Maximum buffer size (10 MB)
-            int bufferSize = (int) Math.min(Math.min(fileSize, availableMemory / 10), maxBufferSize);
+            // Parallel tasks to process each chunk
+            for (long i = 0; i < numChunks; i++) {
+                final long chunkStart = i * chunkSize;
+                final long chunkEnd = Math.min(chunkStart + chunkSize, fileSize);
 
-            ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
+                // Submit a task to process each chunk
+                forkJoinPool.submit(() -> {
+                    try {
+                        ByteBuffer buffer = ByteBuffer.allocate((int) (chunkEnd - chunkStart));
+                        inputChannel.position(chunkStart);
+                        inputChannel.read(buffer);
+                        buffer.flip();
 
-            while (inputChannel.read(buffer) > 0) {
-                buffer.flip();
-                byte[] outputBytes = cipher.update(buffer.array(), 0, buffer.limit());
-                outputChannel.write(ByteBuffer.wrap(outputBytes));
-                buffer.clear();
+                        byte[] outputBytes = cipher.update(buffer.array(), 0, buffer.limit());
+                        outputChannel.write(ByteBuffer.wrap(outputBytes));
+                    } catch (IOException ex) {
+                        ex.printStackTrace();
+                    }
+                });
             }
+
+            // Wait for all tasks to finish
+            forkJoinPool.awaitTermination(1, TimeUnit.MINUTES);
 
             byte[] finalBytes = cipher.doFinal();
             outputChannel.write(ByteBuffer.wrap(finalBytes));
+        }catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // Restore the interrupt status
+            JOptionPane.showMessageDialog(this, "The operation was interrupted.", "Error", JOptionPane.ERROR_MESSAGE);
         }
+        
     }
 
     public static void main(String[] args) {
