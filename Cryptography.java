@@ -173,17 +173,10 @@ public class Cryptography extends JFrame implements ActionListener {
         }
     }
 
-    public static SecretKeySpec deriveKey(String password) throws Exception {
-        byte[] salt = new byte[16]; // Random salt (it should ideally be stored along with the encrypted file)
-        SecureRandom random = new SecureRandom();
-        random.nextBytes(salt);
-
-        // PBKDF2 key derivation with 10000 iterations, 256-bit key (32 bytes)
+    private static SecretKeySpec deriveKey(String password, byte[] salt) throws Exception {
         PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 10000, 256);
         SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
         byte[] key = factory.generateSecret(spec).getEncoded();
-
-        // Return the derived key
         return new SecretKeySpec(key, "AES");
     }
 
@@ -244,13 +237,6 @@ public class Cryptography extends JFrame implements ActionListener {
             byte[] finalBytes = cipher.doFinal();
             outputChannel.write(ByteBuffer.wrap(finalBytes));
         }
-    }
-
-    private static SecretKeySpec deriveKey(String password, byte[] salt) throws Exception {
-        PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 10000, 256);
-        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        byte[] key = factory.generateSecret(spec).getEncoded();
-        return new SecretKeySpec(key, "AES");
     }
 
     public static void main(String[] args) {
